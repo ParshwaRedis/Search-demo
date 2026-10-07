@@ -1,0 +1,4 @@
+flask
+redis
+numpy
+sentence-transformers

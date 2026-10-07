@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Care Search · Redis</title>
+<style>
+  :root{--bg:#f5f7fa;--ink:#14202b;--muted:#6b7884;--line:#e3e8ee;--teal:#0b7a75;--teal-d:#075f5b;--teal-l:#e3f4f2;
+    --red:#d92d20;--red-l:#fdecea;--amber:#b54708;--amber-l:#fef0c7;--green:#067647;--green-l:#dcfae6;--redis:#dc382c;--redis-l:#fdeceb;--blue:#1849a9;--blue-l:#e0ecff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:#fff;border-bottom:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:12px}
+  .logo{font-weight:700;font-size:18px;color:var(--teal);display:flex;align-items:center;gap:8px}
+  .logo i{width:26px;height:26px;border-radius:7px;background:var(--teal);position:relative}
+  .logo i:after{content:"+";color:#fff;position:absolute;inset:0;text-align:center;line-height:26px;font-style:normal;font-weight:800}
+  .sp{flex:1}
+  .pill{font-size:12px;padding:4px 10px;border-radius:999px;background:#f0f2f5;color:var(--muted)}
+  .pill.redis{background:var(--redis-l);color:var(--redis);font-weight:600}
+  main{max-width:1240px;margin:0 auto;padding:30px 28px 60px}
+  .hero{text-align:center;margin-bottom:16px}
+  .hero h1{font-size:30px;margin:0 0 18px}
+  .sbwrap{position:relative;max-width:720px;margin:0 auto}
+  .searchbar{display:flex;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(20,32,43,.06);overflow:hidden}
+  .searchbar:focus-within{border-color:var(--teal)}
+  .searchbar input{flex:1;border:0;outline:0;font-size:19px;padding:17px 20px}
+  .searchbar button{border:0;background:var(--teal);color:#fff;font-size:16px;font-weight:600;padding:0 28px;cursor:pointer}
+  .sugg{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 28px rgba(20,32,43,.12);z-index:10;text-align:left;overflow:hidden;display:none}
+  .sugg .it{padding:11px 18px;font-size:16px;cursor:pointer}
+  .sugg .it:hover,.sugg .it.on{background:var(--teal-l)}
+  .sugg .ft{font-size:12px;color:var(--muted);padding:7px 18px;border-top:1px solid var(--line);background:#fafbfc;text-align:right}
+  .sugg .ft b{color:var(--redis)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:16px auto 0;max-width:980px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer}
+  .chip:hover{border-color:var(--teal);color:var(--teal)}
+  .chip em{font-style:normal;color:var(--redis);font-weight:600;font-size:11px;margin-left:6px}
+  .toolbar{display:flex;gap:16px;align-items:center;justify-content:center;margin:18px 0 20px;font-size:14px;color:var(--muted);flex-wrap:wrap}
+  select{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:14px}
+  .tabs{display:inline-flex;background:#e9edf1;border-radius:10px;padding:3px}
+  .tabs button{border:0;background:transparent;padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--muted);font-weight:600}
+  .tabs button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  .redisbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:16px;font-size:13px}
+  .redisbar .lbl{color:var(--muted)}
+  .feat{background:var(--redis-l);color:var(--redis);border-radius:999px;padding:5px 12px;font-weight:600}
+  .time{background:var(--ink);color:#fff;border-radius:999px;padding:5px 12px;font-weight:700}
+  .dym{background:var(--amber-l);color:var(--amber);border-radius:999px;padding:5px 12px;cursor:pointer}
+  .dym b{text-decoration:underline}
+  .answer{background:linear-gradient(135deg,#0b7a75,#0e9488);color:#fff;border-radius:16px;padding:22px 26px;display:flex;gap:20px;align-items:center;margin:0 auto 18px;max-width:820px;box-shadow:0 8px 24px rgba(11,122,117,.22)}
+  .answer.emerg{background:linear-gradient(135deg,#b42318,#d92d20)}
+  .answer.none{background:#fff;color:var(--ink);border:2px dashed #c6ced6;box-shadow:none}
+  .answer .av{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;flex:none}
+  .answer.none .av{background:#f0f2f5;color:var(--muted)}
+  .answer h2{margin:0 0 4px;font-size:22px}
+  .answer .meta{opacity:.92;font-size:14px}
+  .answer .cta{margin-left:auto;background:#fff;color:var(--teal-d);border:0;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px;flex:none}
+  .answer.emerg .cta{color:var(--red)}
+  .answer.none .cta{background:var(--teal);color:#fff}
+  .grid{display:grid;gap:14px}
+  .grid.four{grid-template-columns:repeat(4,1fr)}
+  .grid.one{max-width:820px;margin:0 auto}
+  @media(max-width:1000px){.grid.four{grid-template-columns:repeat(2,1fr)}}
+  .col{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .col.win{border:2px solid var(--teal)}
+  .colh{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .colh h3{margin:0;font-size:14px}
+  .ms{font-size:12px;font-weight:700;background:var(--teal-l);color:var(--teal-d);padding:3px 9px;border-radius:999px}
+  .res{padding:11px 14px;border-bottom:1px solid var(--line)}
+  .res:last-child{border-bottom:0}
+  .res .t{font-weight:600;font-size:15px}
+  .res .s{font-size:12px;color:var(--muted);margin-top:3px}
+  .badge{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:5px;margin-right:7px;vertical-align:2px}
+  .b-provider{background:var(--blue-l);color:var(--blue)}.b-service{background:var(--green-l);color:var(--green)}
+  .b-condition{background:var(--amber-l);color:var(--amber)}.b-location{background:#ece9fe;color:#5925dc}
+  .dead{padding:28px 14px;text-align:center;background:var(--red-l);color:var(--red);font-weight:700;font-size:14px}
+  .err{padding:8px 14px;font-size:11px;color:var(--amber);background:var(--amber-l)}
+  .panels{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:14px;margin-top:26px}
+  @media(max-width:1000px){.panels{grid-template-columns:1fr}}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .panel h4{margin:0 0 4px;font-size:14px}
+  .panel .sub{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .btn{border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;font-weight:600}
+  .btn:disabled{opacity:.6}
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 8px}
+  .nums div{background:#f7f9fb;border-radius:8px;padding:8px 10px}
+  .nums small{display:block;font-size:10px;color:var(--muted);text-transform:uppercase}
+  .nums strong{font-size:20px;color:var(--teal-d)}
+  .bars{display:flex;align-items:flex-end;gap:2px;height:54px;border-bottom:1px solid var(--line)}
+  .bars span{flex:1;background:var(--teal);border-radius:2px 2px 0 0;min-height:1px;opacity:.85}
+  .big{display:flex;gap:18px;margin-top:4px}
+  .big div small{display:block;font-size:10px;color:var(--muted);text-transform:uppercase}
+  .big div strong{font-size:24px}
+  .empty{text-align:center;color:var(--muted);padding:30px 0}
+  .spin{opacity:.5}
+  .note{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i></i>Demo Health · Care Search</div>
+  <span class="sp"></span>
+  <span class="pill" id="envPill">connecting…</span>
+  <span class="pill redis">Powered by Redis</span>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>How can we help you today?</h1>
+    <div class="sbwrap">
+      <form class="searchbar" id="f">
+        <input id="q" placeholder="Search doctors, conditions, services…" autocomplete="off" autofocus>
+        <button>Search</button>
+      </form>
+      <div class="sugg" id="sugg"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs"><button id="tPat" class="on">Patient view</button><button id="tCmp">Compare search types</button></div>
+    <label>Location <select id="loc"><option value="any">Any</option><option>Beavercreek</option><option>Centerville</option>
+      <option>Dayton</option><option>Springboro</option><option>Springfield-Demo</option></select></label>
+    <label><input type="checkbox" id="acc"> Accepting new patients</label>
+  </div>
+
+  <div class="redisbar" id="redisbar"></div>
+  <div id="answer"></div>
+  <div id="out"><div class="empty">Start typing or pick an example.</div></div>
+
+  <div class="panels">
+    <div class="panel"><h4>Real-time updates</h4><div class="sub">Change one field in Redis. Searchable instantly.</div>
+      <button class="btn" id="slotBtn">Dr. Peters: cancellation → available today</button></div>
+    <div class="panel"><h4>Performance under load</h4><div class="sub">1,000 hybrid searches, 20 at a time.</div>
+      <button class="btn" id="ltBtn">Run load test</button><div id="lt"></div></div>
+    <div class="panel"><h4>Search analytics</h4><div class="sub">Where keyword search fails patients.</div><div id="stats"></div></div>
+  </div>
+</main>
+
+<script>
+const PRESETS=[["schedule Dr. Peters","Full-text"],["cardeologist","Typo tolerance"],["kids doctor","Synonyms"],
+ ["my knee hurts when I climb stairs","Vector"],["I can't sleep and I'm tired all day","Hybrid"],
+ ["chest pain and I can't breathe","Intent routing"],["best pizza near me","Grounding"]];
+const MODES={keyword:"Keyword (all words)",fuzzy:"Typo-tolerant",vector:"Vector (semantic)",hybrid:"Hybrid"};
+const INTENT={schedule:"Schedule",find_care:"Find care",urgent:"Urgent care",location:"Directions",jobs:"Jobs",emergency:"Emergency",general:"Search"};
+let view="pat",last=null,live=true,sIdx=-1,sItems=[],sD={},sTimer=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+$("chips").innerHTML=PRESETS.map(([q,f])=>`<span class="chip" data-q="${esc(q)}">${esc(q)}<em>${f}</em></span>`).join("");
+$("chips").onclick=e=>{const c=e.target.closest(".chip");if(c)go(c.dataset.q);};
+$("f").onsubmit=e=>{e.preventDefault();hideSugg();go();};
+$("loc").onchange=$("acc").onchange=()=>$("q").value&&go();
+$("tPat").onclick=()=>{view="pat";$("tPat").className="on";$("tCmp").className="";render();};
+$("tCmp").onclick=()=>{view="cmp";$("tCmp").className="on";$("tPat").className="";render();};
+$("slotBtn").onclick=async()=>{await post("/api/availability",{slot:0});$("slotBtn").textContent="Updated ✓";go("schedule Dr. Peters");};
+$("ltBtn").onclick=loadtest;
+
+/* typeahead */
+$("q").addEventListener("input",()=>{clearTimeout(sTimer);sTimer=setTimeout(suggest,60);});
+$("q").addEventListener("keydown",e=>{if($("sugg").style.display!=="block")return;
+  if(e.key==="ArrowDown"){sIdx=Math.min(sIdx+1,sItems.length-1);paint();e.preventDefault();}
+  else if(e.key==="ArrowUp"){sIdx=Math.max(sIdx-1,-1);paint();e.preventDefault();}
+  else if(e.key==="Enter"&&sIdx>=0){e.preventDefault();go(sItems[sIdx].text);}
+  else if(e.key==="Escape")hideSugg();});
+document.addEventListener("click",e=>{if(!e.target.closest(".sbwrap"))hideSugg();});
+async function suggest(){const p=$("q").value.trim();if(p.length<2)return hideSugg();
+  try{sD=await (await fetch("/api/suggest?p="+encodeURIComponent(p))).json();}catch(e){sD={ms:0.4,items:[{text:"Dr. Madeline Peters"}]};}
+  sItems=sD.items;sIdx=-1;sItems.length?paint():hideSugg();}
+function paint(){$("sugg").innerHTML=sItems.map((s,i)=>`<div class="it ${i===sIdx?"on":""}" data-i="${i}">${esc(s.text)}</div>`).join("")+
+  `<div class="ft">Redis autocomplete · <b>${sD.ms} ms</b></div>`;$("sugg").style.display="block";
+  $("sugg").querySelectorAll(".it").forEach(el=>el.onclick=()=>go(sItems[+el.dataset.i].text));}
+function hideSugg(){$("sugg").style.display="none";sIdx=-1;}
+
+/* search */
+async function post(u,b){try{const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});return await r.json();}catch(e){return null;}}
+async function init(){try{const i=await (await fetch("/api/info")).json();$("envPill").textContent=`Redis ${i.version} · ${i.docs} records`;}
+  catch(e){live=false;$("envPill").textContent="preview (sample data)";go(PRESETS[0][0]);}}
+async function go(q){q=q||$("q").value.trim();if(!q)return;$("q").value=q;hideSugg();$("out").classList.add("spin");
+  let d=live?await post("/api/search",{q,location:$("loc").value,accepting:$("acc").checked}):null;
+  last=d||mock(q);$("out").classList.remove("spin");render();}
+const slot=n=>n<0?"":n===0?"Today":n===1?"Tomorrow":`In ${n} days`;
+function card(x){const s=(x.type==="provider"||x.type==="service")?slot(x.next_slot):"";
+  return `<div class="res"><div class="t"><span class="badge b-${x.type}">${esc(x.type)}</span>${esc(x.title)}</div>
+   <div class="s">${[x.specialty,x.location].filter(Boolean).map(esc).join(" · ")}${s?` · <b style="color:var(--green)">${s}</b>`:""}</div>
+   ${view==="cmp"&&x.via?`<div class="s" style="margin-top:4px"><span class="badge" style="background:${x.via==="meaning"?"#f0f2f5;color:var(--muted)":"var(--redis-l);color:var(--redis)"}">${x.via}</span></div>`:""}</div>`;}
+function features(d,M){
+  const f=[]; const it=(d.intent||{}).route;
+  if(it==="emergency")f.push("Intent routing (vector)");
+  else if(d.no_answer)f.push("Vector similarity threshold");
+  else{
+    if(d.entity)f.push("Full-text name match");
+    if(M.keyword.rows.length)f.push("Full-text (BM25)");
+    if(!M.keyword.rows.length&&M.fuzzy.rows.length)f.push("Fuzzy match");
+    f.push("Vector search","Hybrid (FT.HYBRID)");
+    if(it&&it!=="general")f.push("Intent routing");
+    if(d.entity&&(d.alternates||[]).length)f.push("Tag filter + sort");
+  }
+  if(d.spell)f.push("Spellcheck");
+  if($("loc").value!=="any"||$("acc").checked)f.push("Tag filters");
+  return [...new Set(f)];
+}
+function answer(d,M){
+  const it=(d.intent||{}).route;
+  if(it==="emergency"){const ed=d.emergency||{title:"Emergency Department",location:"Dayton"};
+    return `<div class="answer emerg"><div class="av">!</div><div><h2>If this is an emergency, call 911.</h2>
+      <div class="meta">Nearest: ${esc(ed.title)}${ed.location?" · "+esc(ed.location):""} · open 24/7</div></div><button class="cta">Call 911</button></div>`;}
+  if(d.no_answer)return `<div class="answer none"><div class="av">?</div><div><h2>We couldn't find that.</h2>
+      <div class="meta" style="color:var(--muted)">No confident match in our information, so we don't guess.</div></div><button class="cta">Call us</button></div>`;
+  const top=d.entity||(d.patient_rows||M.hybrid.rows)[0]; if(!top)return "";
+  const ini=top.title.replace(/^Dr\.\s*/,"").split(" ").map(w=>w[0]).slice(0,2).join(""), s=slot(top.next_slot);
+  const cta=top.type==="provider"?"Schedule now":top.type==="condition"?"Find a specialist":top.type==="location"?"Get directions":"View details";
+  return `<div class="answer"><div class="av">${esc(ini)}</div><div><h2>${esc(top.title)}</h2>
+     <div class="meta">${[top.specialty,top.location].filter(Boolean).map(esc).join(" · ")}${s?` · Next available: <b>${s}</b>`:""}</div></div>
+     <button class="cta">${cta}</button></div>`;
+}
+function render(){
+  if(!last||!last.modes||!last.modes.length)return;
+  const d=last,M=Object.fromEntries(d.modes.map(m=>[m.mode,m])),h=M.hybrid;
+  $("redisbar").innerHTML=`<span class="time">${h.ms} ms</span><span class="lbl">Redis used:</span>`+
+    features(d,M).map(x=>`<span class="feat">${x}</span>`).join("")+
+    (d.spell?`<span class="dym" id="dym">Did you mean <b>${esc(d.spell.corrected)}</b>?</span>`:"");
+  if(d.spell)$("dym").onclick=()=>go(d.spell.corrected);
+  $("answer").innerHTML=view==="pat"?answer(d,M):"";
+  if(view==="cmp"){
+    $("out").innerHTML=`<div class="grid four">${["keyword","fuzzy","vector","hybrid"].map(k=>{const m=M[k];
+      return `<div class="col ${k==="hybrid"?"win":""}"><div class="colh"><h3>${MODES[k]}</h3><span class="ms">${m.ms} ms</span></div>
+       ${m.note||m.error?`<div class="err">${esc(m.note||m.error)}</div>`:""}
+       ${m.rows.length?m.rows.slice(0,3).map(card).join(""):`<div class="dead">No results</div>`}</div>`;}).join("")}</div>`;
+  } else if(d.no_answer||(d.intent||{}).route==="emergency"){ $("out").innerHTML="";
+  } else {
+    const alts=d.entity?(d.alternates||[]):null, rows=alts||(d.patient_rows||h.rows);
+    const title=d.entity?(alts.length?`Other ${esc(d.entity.specialty)} options`:""):"Results";
+    $("out").innerHTML=(rows.length&&title)?`<div class="grid one"><div class="col"><div class="colh"><h3>${title}</h3></div>${rows.slice(0,4).map(card).join("")}</div></div>`:"";
+  }
+  const st=d.stats; if(st)$("stats").innerHTML=`<div class="big"><div><small>Searches</small><strong>${st.searches}</strong></div>
+    <div><small>Keyword dead ends</small><strong style="color:var(--red)">${st.kw_dead}</strong></div>
+    <div><small>Rescued by Redis</small><strong style="color:var(--green)">${st.hy_answered}</strong></div></div>`;
+}
+
+/* load test */
+async function loadtest(){
+  const q=$("q").value.trim()||"my knee hurts when I climb stairs";
+  $("lt").innerHTML='<div class="note">Running…</div>';$("ltBtn").disabled=true;
+  const d=live?await post("/api/loadtest",{q,n:1000,concurrency:20}):{p50:11.8,p99:21.4,qps:1450,rtt:10.9,errors:0,hist:[0,0,0,0,0,0,0,0,2,40,180,260,210,130,70,40,25,15,10,7,5,3,3,1]};
+  $("ltBtn").disabled=false;
+  if(!d||d.error){$("lt").innerHTML=`<div class="note" style="color:var(--red)">${esc(d?d.error:"failed")}</div>`;return;}
+  const mx=Math.max(...d.hist,1);
+  $("lt").innerHTML=`<div class="nums"><div><small>median</small><strong>${d.p50} ms</strong></div><div><small>p99</small><strong>${d.p99} ms</strong></div>
+   <div><small>per second</small><strong>${d.qps}</strong></div></div>
+   <div class="bars">${d.hist.map(v=>`<span style="height:${Math.max(1,v/mx*100)}%"></span>`).join("")}</div>
+   <div class="note">~${d.rtt} ms of each query is network from this laptop.${d.errors?` ${d.errors} errors.`:""}</div>`;
+}
+
+/* preview-only sample data */
+function mock(q){const p={title:"Dr. Madeline Peters",type:"provider",specialty:"Orthopedic Surgery",location:"Dayton",next_slot:1};
+  const w={title:"Dr. James Whitfield",type:"provider",specialty:"Orthopedic Surgery",location:"Centerville",next_slot:4};
+  return{intent:{route:"schedule"},entity:p,alternates:[w],no_answer:false,spell:null,
+   modes:[{mode:"keyword",rows:[],ms:3.1},{mode:"fuzzy",rows:[p],ms:2.4},{mode:"vector",rows:[p,w],ms:4.0},{mode:"hybrid",rows:[p,w],ms:5.2}],
+   stats:{searches:1,kw_dead:1,hy_answered:1}};}
+init();
+</script>
+</body>
+</html>
